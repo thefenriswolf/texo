@@ -1,0 +1,168 @@
+#!/bin/bash
+
+##############################
+######## CONFIG BEGIN ########
+##############################
+
+# Project Name
+PROJ="sample-project"
+
+# Pick a compiler (default: clang)
+CC="clang"
+
+# Override default linker and use lld instead of system ld?
+LD="-fuse-ld=lld"
+#LD="ld"
+
+# List source files here
+SRC="main.c"
+
+# Header directory
+HEADERS="headers/*.h"
+
+# Pick a C standard (c89 | c99 | c11 | c17 | c18 | c2x)
+CSTD="-std=c18"
+
+# Default warning flags
+STDCFLAGS="-Wall -Wextra -pedantic"
+
+# Optimization (-Oz | -Os | -O0 | -O1 | -O2 | -O3 | -Ofast)
+OPTFLAGS="-O3"
+
+# Debug flags
+DEBUG="-g3"
+
+# Extra warnings
+EXTRAFLAGS="-Wshadow -Wdouble-promotion -Wconversion -Wpadded"
+
+# Linker flags. Popular options (-lm | -lncurses)
+LDFLAGS=""
+
+# static analyzer to use (clang-analyzer | infer)
+ANALYZER="clang-analyzer"
+
+
+############################
+######## CONFIG END ########
+############################
+
+
+# global variables
+INFER="./tools/infer-linux64-v1.1.0/bin/infer"
+
+function texo_help() {
+    clear
+    echo -e "
+
+████████╗███████╗██╗  ██╗ ██████╗ 
+╚══██╔══╝██╔════╝╚██╗██╔╝██╔═══██╗
+   ██║   █████╗   ╚███╔╝ ██║   ██║
+   ██║   ██╔══╝   ██╔██╗ ██║   ██║
+   ██║   ███████╗██╔╝ ██╗╚██████╔╝
+   ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝ 
+                                  "
+    echo -e "Usage:\n\ttexo [command]\n"
+    echo -e "Available commands:\n"
+    echo -e "init:\tinit | i\n"
+    echo -e "shell:\tshell | sh\n"
+    echo -e "fetch latest changes:\tfetch | f | update | u\n"
+    echo -e "build:\tbuild | c | com | compile\n"
+    echo -e "clean:\tclean\n"
+    echo -e "tidy:\ttidy | t\n"
+    echo -e "analyze:\tanalyze | lint | a | l\n"
+}
+
+function texo_init(){
+    mkdir -p static-analysis tools headers
+    echo "
+{ pkgs ? import <nixpkgs> {} }:
+pkgs.mkShell {
+  buildInputs = [
+    pkgs.clang_13
+    pkgs.clang-tools
+    pkgs.clang-analyzer
+    pkgs.lldb
+    pkgs.lld_13
+    pkgs.man
+    pkgs.man-pages
+    pkgs.bashInteractive
+  ];
+}
+" > shell.nix
+
+#TODO: analyzer fails to init and execute
+
+    if ["$ANALYZER" = "infer"]; then
+        curl -o tools/infer-1.1.0.tar.xz -L https://github.com/facebook/infer/releases/download/v1.1.0/infer-linux64-v1.1.0.tar.xz
+        tar -xf tools/infer-1.1.0.tar.xz -C tools/
+        rm tools/infer-1.1.0.tar.xz
+    else
+        echo -e "using clang static analyzer\n"
+    fi
+}
+
+function texo_shell(){
+    nix-shell shell.nix
+}
+
+function texo_fetch(){
+    set -xe
+    git reset --hard
+    git pull --rebase
+}
+
+function texo_compile(){
+    set -xe
+    $CC $LD $CSTD $STDFLAGS $OPTFLAGS $DEBUG $EXTRAFLAGS $LDFLAGS -o $PROJ $SRC
+}
+
+function texo_clean(){
+    set -xe
+    rm -rfv *.o *.out $PROJ *~ infer-out
+}
+
+function texo_tidy(){
+    set -xe
+    clang-tidy $SRC $HEADERS
+}
+
+function texo_analyze(){
+    set -xe
+    if [$ANALYZER = "infer"]; then
+        $INFER run --reactive --continue -- $CC $LDFLAGS $LD $SRC -o static-analysis/inf.out
+    elif [$ANALYZER = "clang-analyzer"]; then
+        scan-build -k -v --force-analyze-debug-code -o static-analysis/ $CC $SRC
+    else
+        echo -e $ANALYZER" is not a valid option\n"
+    fi
+}
+
+case $1 in
+    init | i)
+        texo_init
+        ;;
+    shell | sh)
+        texo_shell
+        ;;
+    fetch | f | update | u)
+        texo_fetch
+        ;;
+    com | compile | c | build)
+        texo_compile
+        ;;
+    clean)
+        texo_clean
+        ;;
+    tidy | t)
+        texo_tidy
+        ;;
+    analyze | lint | a | l)
+        texo_analyze
+        ;;
+    *)
+        clear
+        texo_help
+        ;;
+esac
+
+
