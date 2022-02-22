@@ -10,7 +10,13 @@
 ```
 
 # texo
-A simple build system based on bash.
+A simple build system based on bash and nixpkgs.
+
+## requirements
+
+- bash (duh)
+- nixpkgs
+- curl
 
 ## usage
 1. edit texo source file and fill out the config section

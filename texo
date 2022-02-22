@@ -5,17 +5,16 @@
 ##############################
 
 # Project Name
-PROJ="sample-project"
+PROJ="default"
 
 # Pick a compiler (default: clang)
-CC="clang"
+CC="default"
 
-# Override default linker and use lld instead of system ld?
-LD="-fuse-ld=lld"
-#LD="ld"
+# Pick a linker (ld | lld)
+LD="-fuse-ld=default"
 
 # List source files here
-SRC="main.c"
+SRC="default"
 
 # Header directory
 HEADERS="headers/*.h"
@@ -38,7 +37,7 @@ EXTRAFLAGS="-Wshadow -Wdouble-promotion -Wconversion -Wpadded"
 # Linker flags. Popular options (-lm | -lncurses)
 LDFLAGS=""
 
-# static analyzer to use (clang-analyzer | infer)
+# static analyzer to use (clang-analyzer | infer | none)
 ANALYZER="clang-analyzer"
 
 
@@ -52,14 +51,15 @@ INFER="./tools/infer-linux64-v1.1.0/bin/infer"
 
 function texo_help() {
     clear
+    #TODO: beautify
     echo -e "
 
-████████╗███████╗██╗  ██╗ ██████╗ 
+████████╗███████╗██╗  ██╗ ██████╗
 ╚══██╔══╝██╔════╝╚██╗██╔╝██╔═══██╗
    ██║   █████╗   ╚███╔╝ ██║   ██║
    ██║   ██╔══╝   ██╔██╗ ██║   ██║
    ██║   ███████╗██╔╝ ██╗╚██████╔╝
-   ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝ 
+   ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝
                                   "
     echo -e "Usage:\n\ttexo [command]\n"
     echo -e "Available commands:\n"
@@ -72,8 +72,19 @@ function texo_help() {
     echo -e "analyze:\tanalyze | lint | a | l\n"
 }
 
+function texo_config_check(){
+    local def="default"
+    if [[ $PROJ = $def || $CC = $def || $LD = "-fuse-ld=default" || $SRC = $def ]]; then
+        echo -e "INFO: please visit the config section before invoking texo\n"
+        exit
+    fi
+}
+
 function texo_init(){
+    echo -e "INFO: creating folders\n"
     mkdir -p static-analysis tools headers
+    #TODO: make this user configurable
+    echo -e "INFO: write shell.nix\n"
     echo "
 { pkgs ? import <nixpkgs> {} }:
 pkgs.mkShell {
@@ -90,18 +101,23 @@ pkgs.mkShell {
 }
 " > shell.nix
 
-#TODO: analyzer fails to init and execute
-
-    if ["$ANALYZER" = "infer"]; then
+    local analyzer_infer="infer"
+    local analyzer_clang="clang-analyzer"
+    if [[ $ANALYZER = $analyzer_infer ]]; then
+        echo -e "INFO: downloading and installing infer\n"
         curl -o tools/infer-1.1.0.tar.xz -L https://github.com/facebook/infer/releases/download/v1.1.0/infer-linux64-v1.1.0.tar.xz
         tar -xf tools/infer-1.1.0.tar.xz -C tools/
         rm tools/infer-1.1.0.tar.xz
+    elif [[ $ANALYZER = $analyzer_clang ]]; then
+        echo -e "INFO: using clang static analyzer\n"
     else
-        echo -e "using clang static analyzer\n"
+        echo -e "INFO: no static analyzer configured\n"
     fi
 }
 
 function texo_shell(){
+    #TODO: maybe use --pure
+    echo -e "INFO: entering nix-shell\n"
     nix-shell shell.nix
 }
 
@@ -127,36 +143,50 @@ function texo_tidy(){
 }
 
 function texo_analyze(){
+    local analyzer_infer="infer"
+    local analyzer_clang="clang-analyzer"
     set -xe
-    if [$ANALYZER = "infer"]; then
+    if [[ $ANALYZER = $analyzer_infer ]]; then
         $INFER run --reactive --continue -- $CC $LDFLAGS $LD $SRC -o static-analysis/inf.out
-    elif [$ANALYZER = "clang-analyzer"]; then
+    elif [[ $ANALYZER = $analyzer_clang ]]; then
+        #TODO: check clang-analyzer if this really works
         scan-build -k -v --force-analyze-debug-code -o static-analysis/ $CC $SRC
+    elif [[ $ANALYZER = "none" ]]; then
+        echo -e "INFO: no static analyzer configured\n"
     else
-        echo -e $ANALYZER" is not a valid option\n"
+        echo -e "ERROR: not a valid option: "
+        echo -e $ANALYZER
+        echo -e "\n"
     fi
 }
 
 case $1 in
     init | i)
+        texo_config_check
         texo_init
         ;;
     shell | sh)
+        texo_config_check
         texo_shell
         ;;
     fetch | f | update | u)
+        texo_config_check
         texo_fetch
         ;;
     com | compile | c | build)
+        texo_config_check
         texo_compile
         ;;
     clean)
+        texo_config_check
         texo_clean
         ;;
     tidy | t)
+        texo_config_check
         texo_tidy
         ;;
     analyze | lint | a | l)
+        texo_config_check
         texo_analyze
         ;;
     *)
@@ -164,5 +194,3 @@ case $1 in
         texo_help
         ;;
 esac
-
-
