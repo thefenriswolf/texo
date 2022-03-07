@@ -48,11 +48,16 @@ ANALYZER="clang-analyzer"
 
 # global variables
 INFER="./tools/infer-linux64-v1.1.0/bin/infer"
+red='\e[31m'
+green='\e[32m'
+blue='\e[34m'
+bold='\e[1m'
+clear='\e[0m'
 
 function texo_help() {
     clear
     #TODO: beautify
-    echo -e "
+    echo -e $blue"
 
 ████████╗███████╗██╗  ██╗ ██████╗
 ╚══██╔══╝██╔════╝╚██╗██╔╝██╔═══██╗
@@ -60,31 +65,31 @@ function texo_help() {
    ██║   ██╔══╝   ██╔██╗ ██║   ██║
    ██║   ███████╗██╔╝ ██╗╚██████╔╝
    ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝
-                                  "
-    echo -e "Usage:\n\ttexo [command]\n"
-    echo -e "Available commands:\n"
-    echo -e "init:\tinit | i\n"
-    echo -e "shell:\tshell | sh\n"
-    echo -e "fetch latest changes:\tfetch | f | update | u\n"
-    echo -e "build:\tbuild | c | com | compile\n"
-    echo -e "clean:\tclean\n"
-    echo -e "tidy:\ttidy | t\n"
-    echo -e "analyze:\tanalyze | lint | a | l\n"
+                                  "$clear
+    echo -e $bold"Usage:$clear texo [command]\n"
+    echo -e $bold"  Available commands:\n"$clear
+    echo -e "  init | i\t\t\tinit project"
+    echo -e "  shell | sh\t\t\tload shell env"
+    echo -e "  fetch | f | update | u\tfetch latest changes"
+    echo -e "  build | c | com | compile\tbuild project"
+    echo -e "  clean\t\t\t\tcleanup"
+    echo -e "  tidy | t\\t\t\ttrun clang-tidy"
+    echo -e "  analyze | lint | a | l\trun static analyzer"
 }
 
 function texo_config_check(){
     local def="default"
     if [[ $PROJ = $def || $CC = $def || $LD = "-fuse-ld=default" || $SRC = $def ]]; then
-        echo -e "INFO: please visit the config section before invoking texo\n"
+        echo -ne $red"ERROR: please visit the config section before invoking texo\n"$clear
         exit
     fi
 }
 
 function texo_init(){
-    echo -e "INFO: creating folders\n"
+    echo -ne $green"WORKING: creating folders\n"$clear
     mkdir -p static-analysis tools headers
     #TODO: make this user configurable
-    echo -e "INFO: write shell.nix\n"
+    echo -ne $green"WORKING: write shell.nix\n"$clear
     echo "
 { pkgs ? import <nixpkgs> {} }:
 pkgs.mkShell {
@@ -104,20 +109,20 @@ pkgs.mkShell {
     local analyzer_infer="infer"
     local analyzer_clang="clang-analyzer"
     if [[ $ANALYZER = $analyzer_infer ]]; then
-        echo -e "INFO: downloading and installing infer\n"
+        echo -ne $green"WORKING: downloading and installing infer\n"$clear
         curl -o tools/infer-1.1.0.tar.xz -L https://github.com/facebook/infer/releases/download/v1.1.0/infer-linux64-v1.1.0.tar.xz
         tar -xf tools/infer-1.1.0.tar.xz -C tools/
         rm tools/infer-1.1.0.tar.xz
     elif [[ $ANALYZER = $analyzer_clang ]]; then
-        echo -e "INFO: using clang static analyzer\n"
+        echo -ne $blue"INFO: using clang static analyzer\n"$clear
     else
-        echo -e "INFO: no static analyzer configured\n"
+        echo -ne $red"ERROR: no static analyzer configured\n"$clear
     fi
 }
 
 function texo_shell(){
     #TODO: maybe use --pure
-    echo -e "INFO: entering nix-shell\n"
+    echo -ne $green"WORKING: entering nix-shell\n"$clear
     nix-shell shell.nix
 }
 
@@ -152,9 +157,9 @@ function texo_analyze(){
         #TODO: check clang-analyzer if this really works
         scan-build -k -v --force-analyze-debug-code -o static-analysis/ $CC $SRC
     elif [[ $ANALYZER = "none" ]]; then
-        echo -e "INFO: no static analyzer configured\n"
+        echo -ne $red"ERROR: no static analyzer configured\n"$clear
     else
-        echo -e "ERROR: not a valid option: "
+        echo -ne $red"ERROR: not a valid option: "$clear
         echo -e $ANALYZER
         echo -e "\n"
     fi
