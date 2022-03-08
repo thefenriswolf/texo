@@ -48,11 +48,43 @@ ANALYZER="clang-analyzer"
 
 # global variables
 INFER="./tools/infer-linux64-v1.1.0/bin/infer"
+
 red='\e[31m'
 green='\e[32m'
 blue='\e[34m'
 bold='\e[1m'
 clear='\e[0m'
+
+envClang="
+{ pkgs ? import <nixpkgs> {} }:\n
+pkgs.mkShell {\n
+  buildInputs = [\n
+    pkgs.clangStdenv\n
+    pkgs.clang_13\n
+    pkgs.clang-tools\n
+    pkgs.clang-analyzer\n
+    pkgs.lldb\n
+    pkgs.llvmPackages_13.bintools\n
+# pkgs.lld_13\n
+    pkgs.man\n
+    pkgs.man-pages\n
+    pkgs.bashInteractive\n
+  ];\n
+}"
+
+envGCC="
+{ pkgs ? import <nixpkgs> {} }:\n
+pkgs.mkShell {\n
+  buildInputs = [\n
+    pkgs.gccStdenv\n
+    pkgs.gcc\n
+    pkgs.clang-tools\n
+    pkgs.gdb\n
+    pkgs.man\n
+    pkgs.man-pages\n
+    pkgs.bashInteractive\n
+  ];\n
+}"
 
 function texo_help() {
     clear
@@ -90,21 +122,13 @@ function texo_init(){
     mkdir -p static-analysis tools headers
     #TODO: make this user configurable
     echo -ne $green"WORKING: write shell.nix\n"$clear
-    echo "
-{ pkgs ? import <nixpkgs> {} }:
-pkgs.mkShell {
-  buildInputs = [
-    pkgs.clang_13
-    pkgs.clang-tools
-    pkgs.clang-analyzer
-    pkgs.lldb
-    pkgs.lld_13
-    pkgs.man
-    pkgs.man-pages
-    pkgs.bashInteractive
-  ];
-}
-" > shell.nix
+    if [[ $CC = 'gcc' ]]; then
+        echo -e $envGCC > shell.nix
+    elif [[ $CC = 'clang' ]]; then
+        echo -e $envClang > shell.nix
+    else
+        echo -ne $red"ERROR: no compiler configured\n"$clear
+    fi
 
     local analyzer_infer="infer"
     local analyzer_clang="clang-analyzer"
