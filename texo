@@ -11,7 +11,7 @@ PROJ="default"
 CC="default"
 
 # Pick a linker (ld | lld)
-LD="-fuse-ld=default"
+LD="default"
 
 # List source files here
 SRC="default"
@@ -39,7 +39,6 @@ LDFLAGS=""
 
 # static analyzer to use (clang-analyzer | infer | none)
 ANALYZER="clang-analyzer"
-
 
 ############################
 ######## CONFIG END ########
@@ -82,10 +81,50 @@ int main(void) {
   return 0;
 }"
 
+#TODO: this is broken right now, fix
+mkfile="
+TARGET = $PROJ
+SRCS  = $SRC
+HEADS = $HEADERS
+OBJS = $(SRCS:.c=.o)
+DEPS = 
+INCLUDES =
+CC = $CC
+LD = $LD
+INFER_PATH = $INFER
+CFLAGS = $CSTD $STDCFLAGS $OPTFLAGS $DEBUG $EXTRAFLAGS
+LDFLAGS = $LDFLAGS
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS) $(HEADS)
+\t$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+
+run: all
+\t@./$(TARGET)
+
+.PHONY: fetch clean
+
+tidy: $(SRCS) $(HEADS)
+\tclang-tidy $(SRCS) $(HEADS)
+
+analyze: $(SRCS)
+\techo \"not implemented yet\"
+\t$(INFER_PATH) run --reactive --continue -- $(CC) $(LDFLAGS) -fuse-ld=$(LD) $(SRCS) -o static-analysis/inf.out
+
+fetch:
+\tgit reset --hard
+\tgit pull --rebase
+
+clean:
+\trm -rfv $(OBJS) $(TARGET) *~ infer-out tools/testbench
+"
+
 envClang="
 { pkgs ? import <nixpkgs> {} }:
 pkgs.mkShell {
   buildInputs = [
+    pkgs.gnumake
     pkgs.clangStdenv
     pkgs.clang_13
     pkgs.clang-tools
@@ -103,6 +142,7 @@ envGCC="
 { pkgs ? import <nixpkgs> {} }:
 pkgs.mkShell {
   buildInputs = [
+    pkgs.gnumake
     pkgs.gccStdenv
     pkgs.gcc
     pkgs.clang-tools
@@ -135,11 +175,12 @@ function texo_help() {
     echo -e "  tidy | t\\t\t\ttrun clang-tidy"
     echo -e "  analyze | lint | a | l\trun static analyzer"
     echo -e "  benchmark | ttd | bench\trun testbench"
+    echo -e "  dump | gen | genmake\t\tdump config as makefile"
 }
 
 function texo_config_check(){
     local def="default"
-    if [[ $PROJ = $def || $CC = $def || $LD = "-fuse-ld=default" || $SRC = $def ]]; then
+    if [[ $PROJ = $def || $CC = $def || $LD = $def || $SRC = $def ]]; then
         echo -ne $red"ERROR: please visit the config section before invoking texo\n"$clear
         exit
     fi
@@ -187,7 +228,7 @@ function texo_fetch(){
 
 function texo_compile(){
     set -xe
-    $CC $LD $CSTD $STDFLAGS $OPTFLAGS $DEBUG $EXTRAFLAGS $LDFLAGS -o $PROJ $SRC
+    $CC -fuse-ld=$LD $CSTD $STDFLAGS $OPTFLAGS $DEBUG $EXTRAFLAGS $LDFLAGS -o $PROJ $SRC
 }
 
 function texo_clean(){
@@ -205,7 +246,7 @@ function texo_analyze(){
     local analyzer_clang="clang-analyzer"
     set -xe
     if [[ $ANALYZER = $analyzer_infer ]]; then
-        $INFER run --reactive --continue -- $CC $LDFLAGS $LD $SRC -o static-analysis/inf.out
+        $INFER run --reactive --continue -- $CC $LDFLAGS -fuse-ld=$LD $SRC -o static-analysis/inf.out
     elif [[ $ANALYZER = $analyzer_clang ]]; then
         #TODO: check clang-analyzer if this really works
         scan-build -k -v --force-analyze-debug-code -o static-analysis/ $CC $SRC
@@ -220,8 +261,13 @@ function texo_analyze(){
 
 function texo_testbench(){
     set -xe
-    $CC $LD $CSTD $STDFLAGS $DEBUG $EXTRAFLAGS $LDFLAGS -o tools/testbench tools/testbench.c ${SRC//main.c}
+    $CC -fuse-ld=$LD $CSTD $STDFLAGS $DEBUG $EXTRAFLAGS $LDFLAGS -o tools/testbench tools/testbench.c ${SRC//main.c}
     ./tools/testbench
+}
+
+function texo_dump(){
+    echo "not implemented yet"
+    #echo -e "$mkfile" > Makefile
 }
 
 case $1 in
@@ -256,6 +302,10 @@ case $1 in
     testbench | benchmark | ttd | bench)
         texo_config_check
         texo_testbench
+        ;;
+    dump | gen | genmake)
+        #texo_config_check
+        texo_dump
         ;;
     *)
         clear
