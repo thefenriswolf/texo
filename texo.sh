@@ -172,7 +172,7 @@ function texo_help() {
     echo -e "  fetch | f | update | u\tfetch latest changes"
     echo -e "  build | c | com | compile\tbuild project"
     echo -e "  clean\t\t\t\tcleanup"
-    echo -e "  tidy | t\\t\t\ttrun clang-tidy"
+    echo -e "  tidy | t\\t\t\trun clang-tidy"
     echo -e "  analyze | lint | a | l\trun static analyzer"
     echo -e "  benchmark | ttd | bench\trun testbench"
     echo -e "  dump | gen | genmake\t\tdump config as makefile"
